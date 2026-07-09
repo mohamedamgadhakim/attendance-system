@@ -19,22 +19,24 @@ conn.commit()
 # --- ADMIN PANEL ---
 with st.sidebar:
     st.header("Admin Panel")
-    if st.text_input("Admin Password", type="password") == "1234":
+    if st.text_input("Admin Password", type="password") == "1122":
         
-        # تصدير تقرير احترافي (HTML)
+        # تصدير تقرير مرتب
         st.subheader("Professional Export")
-        df = pd.read_sql("SELECT * FROM logs", conn)
+        # سحب البيانات وترتيبها: اسم الموظف -> نوع الحركة -> الوقت
+        df = pd.read_sql("SELECT * FROM logs ORDER BY name, type DESC, time", conn)
         
-        html_content = "<html><body><h1>Attendance Report</h1><table border='1'><tr><th>Name</th><th>Time</th><th>Action</th><th>Photo</th></tr>"
+        html_content = "<html><head><style>table {width:100%; border-collapse: collapse;} th, td {border: 1px solid black; padding: 8px; text-align: left;}</style></head><body>"
+        html_content += "<h1>Attendance Report (Organized)</h1><table><tr><th>Name</th><th>Time</th><th>Action</th><th>Photo</th></tr>"
+        
         for _, row in df.iterrows():
-            img_tag = f"<img src='data:image/png;base64,{row['photo']}' width='100'>" if row['photo'] else "No Photo"
+            img_tag = f"<img src='data:image/png;base64,{row['photo']}' width='80'>" if row['photo'] else "No Photo"
             html_content += f"<tr><td>{row['name']}</td><td>{row['time']}</td><td>{row['type']}</td><td>{img_tag}</td></tr>"
         html_content += "</table></body></html>"
         
-        st.download_button("Download Report as Excel/HTML", html_content, "attendance_report.html", "text/html")
+        st.download_button("Download Report (Ordered)", html_content, "organized_report.html", "text/html")
         
         st.divider()
-        # إضافة موظفين
         with st.expander("➕ Add Employee"):
             name = st.text_input("Emp Name")
             lat, lon = st.number_input("Lat", format="%.6f"), st.number_input("Lon", format="%.6f")
@@ -45,9 +47,9 @@ with st.sidebar:
                 st.success("Added!")
 
 # --- EMPLOYEE PORTAL ---
-st.title("Employee Attendance")
+st.title("Attendance Portal")
 emp_names = list(set([r[0] for r in c.execute("SELECT name FROM employees").fetchall()]))
-selected_name = st.selectbox("Select Your Name", emp_names)
+selected_name = st.selectbox("Select Name", emp_names)
 
 if selected_name:
     loc = streamlit_geolocation()
