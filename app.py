@@ -9,10 +9,13 @@ from streamlit_geolocation import streamlit_geolocation
 
 # --- CONFIG ---
 st.set_page_config(page_title="Attendance Pro", layout="wide")
-dubai_tz = pytz.timezone("Dubai")
-conn = sqlite3.connect('attendance_pro_v3.db', check_same_thread=False)
+# التصحيح هنا: استخدام الصيغة الصحيحة للمنطقة الزمنية
+dubai_tz = pytz.timezone("Asia/Dubai") 
+# تغيير اسم الداتابيز هنا سيجبر النظام على عمل هيكل جديد صحيح
+conn = sqlite3.connect('attendance_pro_final.db', check_same_thread=False)
 c = conn.cursor()
 
+# إنشاء الجداول بهيكل ثابت ومحدث
 c.execute('CREATE TABLE IF NOT EXISTS employees (name TEXT PRIMARY KEY, lat REAL, lon REAL, radius REAL, salary REAL)')
 c.execute('CREATE TABLE IF NOT EXISTS logs (name TEXT, time TEXT, type TEXT, lat REAL, lon REAL, photo TEXT)')
 conn.commit()
@@ -22,7 +25,7 @@ with st.sidebar:
     st.header("Admin Control")
     if st.text_input("Admin Password", type="password") == "1234":
         
-        # 1. ADD NEW EMPLOYEE
+        # إضافة موظف
         with st.expander("➕ Add New Employee"):
             new_name = st.text_input("Full Name")
             new_lat = st.number_input("Latitude", format="%.6f")
@@ -37,7 +40,7 @@ with st.sidebar:
                 except:
                     st.error("Employee already exists.")
 
-        # 2. EDIT/DELETE EMPLOYEE
+        # تعديل/حذف موظف
         with st.expander("✏️ Edit / Delete Employee"):
             emp_list = [r[0] for r in c.execute("SELECT name FROM employees").fetchall()]
             target_name = st.selectbox("Select Employee", emp_list)
@@ -53,32 +56,30 @@ with st.sidebar:
                     c.execute("UPDATE employees SET lat=?, lon=?, radius=?, salary=? WHERE name=?", (e_lat, e_lon, e_rad, e_sal, target_name))
                     conn.commit()
                     st.success("Updated successfully!")
-                
                 if col_d.button("🗑️ Delete Employee"):
                     c.execute("DELETE FROM employees WHERE name=?", (target_name,))
                     conn.commit()
-                    st.warning(f"{target_name} has been deleted.")
                     st.rerun()
 
-        # 3. REPORTS
+        # التقارير
         st.subheader("Monthly Reports")
         if st.button("Cleanup Old Data (> 60 days)"):
             c.execute("DELETE FROM logs WHERE time < ?", ((datetime.now() - timedelta(days=60)).strftime("%Y-%m-%d %H:%M:%S"),))
             conn.commit()
         
         df = pd.read_sql("SELECT * FROM logs", conn)
-        df['time'] = pd.to_datetime(df['time'])
-        df['month'] = df['time'].dt.strftime('%Y-%m')
-        selected_month = st.selectbox("Select Month", sorted(df['month'].unique(), reverse=True))
-        
-        if st.button("Export Selected Month"):
-            filtered_df = df[df['month'] == selected_month].sort_values(['name', 'type', 'time'])
-            html = "<html><body><h1>Report</h1><table border='1'><tr><th>Name</th><th>Time</th><th>Action</th><th>Photo</th></tr>"
-            for _, row in filtered_df.iterrows():
-                img_tag = f"<img src='data:image/png;base64,{row['photo']}' width='60'>" if row['photo'] else "No Photo"
-                html += f"<tr><td>{row['name']}</td><td>{row['time']}</td><td>{row['type']}</td><td>{img_tag}</td></tr>"
-            html += "</table></body></html>"
-            st.download_button("Download Report", html, f"report_{selected_month}.html", "text/html")
+        if not df.empty:
+            df['time'] = pd.to_datetime(df['time'])
+            df['month'] = df['time'].dt.strftime('%Y-%m')
+            selected_month = st.selectbox("Select Month", sorted(df['month'].unique(), reverse=True))
+            if st.button("Export Selected Month"):
+                filtered_df = df[df['month'] == selected_month].sort_values(['name', 'type', 'time'])
+                html = "<html><body><h1>Report</h1><table border='1'><tr><th>Name</th><th>Time</th><th>Action</th><th>Photo</th></tr>"
+                for _, row in filtered_df.iterrows():
+                    img_tag = f"<img src='data:image/png;base64,{row['photo']}' width='60'>" if row['photo'] else "No Photo"
+                    html += f"<tr><td>{row['name']}</td><td>{row['time']}</td><td>{row['type']}</td><td>{img_tag}</td></tr>"
+                html += "</table></body></html>"
+                st.download_button("Download Report", html, f"report_{selected_month}.html", "text/html")
 
 # --- EMPLOYEE PORTAL ---
 st.title("📍 Employee Attendance Portal")
