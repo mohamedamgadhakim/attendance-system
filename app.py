@@ -10,11 +10,10 @@ from geopy.distance import geodesic
 # --- CONFIG ---
 st.set_page_config(page_title="Pro Attendance System", layout="wide")
 dubai_tz = pytz.timezone("Asia/Dubai")
-# نستخدم اسم قاعدة بيانات جديد لضمان توافق الجدول بالكامل
 conn = sqlite3.connect('attendance_pro_v3.db', check_same_thread=False)
 c = conn.cursor()
 
-# تهيئة الجداول بهيكل دقيق
+# Init Tables
 c.execute('CREATE TABLE IF NOT EXISTS employees (name TEXT, lat REAL, lon REAL, radius REAL, salary REAL)')
 c.execute('CREATE TABLE IF NOT EXISTS logs (name TEXT, time TEXT, type TEXT, lat REAL, lon REAL, photo TEXT)')
 conn.commit()
@@ -23,38 +22,36 @@ conn.commit()
 with st.sidebar:
     st.header("Admin Panel")
     if st.text_input("Admin Password", type="password") == "1234":
-        st.subheader("Manage Employees")
-        name = st.text_input("Emp Name")
-        lat, lon = st.number_input("Lat", format="%.6f"), st.number_input("Lon", format="%.6f")
-        rad = st.number_input("Radius (meters)", value=200.0)
-        sal = st.number_input("Salary", value=3000.0)
-        if st.button("Add/Update Location"):
-            c.execute("INSERT INTO employees VALUES (?,?,?,?,?)", (name, lat, lon, rad, sal))
-            conn.commit()
-            st.success("Location Added!")
-
-        st.subheader("Attendance Logs")
+        st.subheader("Reports & Export")
         df = pd.read_sql("SELECT * FROM logs", conn)
+        
+        # تصدير البيانات كاملة
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="Download Full Report (CSV)",
+            data=csv,
+            file_name='attendance_full_report.csv',
+            mime='text/csv'
+        )
+        
+        st.divider()
+        st.subheader("Attendance Logs")
         for index, row in df.iterrows():
             st.write(f"**{row['name']}** | {row['time']} | {row['type']}")
             if row['photo']:
-                st.image(base64.b64decode(row['photo']), width=150)
+                st.image(base64.b64decode(row['photo']), width=100)
             st.divider()
 
 # --- EMPLOYEE PORTAL ---
 st.title("Employee Attendance System")
-# جلب أسماء الموظفين الفريدة
 emp_names = list(set([r[0] for r in c.execute("SELECT name FROM employees").fetchall()]))
 selected_name = st.selectbox("Select Your Name", emp_names)
 
 if selected_name:
     loc = streamlit_geolocation()
     if loc and loc['latitude']:
-        # التحقق من كافة مواقع الموظف
         allowed = c.execute("SELECT lat, lon, radius FROM employees WHERE name=?", (selected_name,)).fetchall()
-        in_range = any([geodesic((loc['latitude'], loc['longitude']), (l[0], l[1])).meters <= l[2] for l in allowed])
-        
-        if in_range:
+        if any([geodesic((loc['latitude'], loc['longitude']), (l[0], l[1])).meters <= l[2] for l in allowed]):
             st.success("Verified: In Authorized Zone")
             img = st.camera_input("Take Attendance Photo")
             if img:
