@@ -8,51 +8,62 @@ from geopy.distance import geodesic
 
 # Setup
 dubai_tz = pytz.timezone("Asia/Dubai")
-conn = sqlite3.connect('attendance_final.db', check_same_thread=False)
+conn = sqlite3.connect('attendance_pro.db', check_same_thread=False)
 c = conn.cursor()
-c.execute('CREATE TABLE IF NOT EXISTS employees (name TEXT PRIMARY KEY, lat REAL, lon REAL, radius REAL)')
-c.execute('CREATE TABLE IF NOT EXISTS logs (name TEXT, time TEXT, action TEXT)')
+
+# Tables Setup
+c.execute('''CREATE TABLE IF NOT EXISTS employees 
+             (name TEXT PRIMARY KEY, lat REAL, lon REAL, radius REAL, salary REAL, work_days TEXT)''')
+c.execute('''CREATE TABLE IF NOT EXISTS logs 
+             (name TEXT, time TEXT, type TEXT, lat REAL, lon REAL, photo_taken TEXT)''')
 conn.commit()
 
-st.title("Attendance System - Dubai")
+st.title("Attendance & Payroll Pro System")
 
 # Admin Dashboard
-with st.expander("Admin Panel"):
-    if st.text_input("Password", type="password") == "1234":
-        name_in = st.text_input("New Employee Name")
-        lat_in = st.number_input("Lat", format="%.6f")
-        lon_in = st.number_input("Lon", format="%.6f")
-        rad_in = st.number_input("Radius (meters)", value=200.0)
-        if st.button("Add Employee"):
-            c.execute("REPLACE INTO employees VALUES (?,?,?,?)", (name_in, lat_in, lon_in, rad_in))
-            conn.commit()
-            st.success("Employee added.")
-        st.dataframe(pd.read_sql("SELECT * FROM employees", conn))
+with st.expander("Admin Control Panel"):
+    if st.text_input("Admin Password", type="password") == "1234":
+        tab1, tab2 = st.tabs(["Manage Employees", "Reports & Payroll"])
+        with tab1:
+            name = st.text_input("Name")
+            lat, lon = st.number_input("Lat", format="%.6f"), st.number_input("Lon", format="%.6f")
+            rad = st.number_input("Radius", value=200.0)
+            sal = st.number_input("Monthly Salary")
+            days = st.text_input("Work Days (e.g., Mon-Sat)")
+            if st.button("Add/Update Employee"):
+                c.execute("REPLACE INTO employees VALUES (?,?,?,?,?,?)", (name, lat, lon, rad, sal, days))
+                conn.commit()
+                st.success("Employee updated.")
+        with tab2:
+            df = pd.read_sql("SELECT * FROM logs", conn)
+            st.dataframe(df)
+            # Payroll Logic: Deductions
+            if st.button("Calculate Salaries"):
+                # Logic: 9:10 threshold
+                df['time'] = pd.to_datetime(df['time'])
+                late_count = df[df['time'].dt.hour >= 9].shape[0] # Example Logic
+                st.write(f"Total Late Entries Detected: {late_count}")
+                st.download_button("Export Full Report", df.to_csv(), "Payroll_Report.csv")
 
 # Employee Workflow
 emp_names = [r[0] for r in c.execute("SELECT name FROM employees").fetchall()]
-selected_name = st.selectbox("Select your name", emp_names)
+selected_name = st.selectbox("Select Name", emp_names)
 
 if selected_name:
     loc = streamlit_geolocation()
     if loc and loc['latitude']:
-        emp_data = c.execute("SELECT lat, lon, radius FROM employees WHERE name=?", (selected_name,)).fetchone()
-        dist = geodesic((loc['latitude'], loc['longitude']), (emp_data[0], emp_data[1])).meters
-        
-        if dist <= emp_data[2]:
-            st.success("Location Verified!")
-            img = st.camera_input("Take your photo")
+        emp = c.execute("SELECT lat, lon, radius FROM employees WHERE name=?", (selected_name,)).fetchone()
+        if geodesic((loc['latitude'], loc['longitude']), (emp[0], emp[1])).meters <= emp[2]:
+            st.success("Verified: In Location")
+            img = st.camera_input("Take Photo for Attendance")
             if img:
                 col1, col2 = st.columns(2)
+                now_str = datetime.now(dubai_tz).strftime("%Y-%m-%d %H:%M:%S")
                 if col1.button("Check-in"):
-                    c.execute("INSERT INTO logs VALUES (?, ?, ?)", (selected_name, datetime.now(dubai_tz).strftime("%Y-%m-%d %H:%M:%S"), "Check-in"))
+                    c.execute("INSERT INTO logs VALUES (?,?,?,?,?,?)", (selected_name, now_str, "In", loc['latitude'], loc['longitude'], "Yes"))
                     conn.commit()
-                    st.success("Check-in recorded!")
                 if col2.button("Check-out"):
-                    c.execute("INSERT INTO logs VALUES (?, ?, ?)", (selected_name, datetime.now(dubai_tz).strftime("%Y-%m-%d %H:%M:%S"), "Check-out"))
+                    c.execute("INSERT INTO logs VALUES (?,?,?,?,?,?)", (selected_name, now_str, "Out", loc['latitude'], loc['longitude'], "Yes"))
                     conn.commit()
-                    st.success("Check-out recorded!")
         else:
-            st.error(f"You are out of range! Distance: {int(dist)}m")
-    else:
-        st.info("Checking location...")
+            st.error("Access Denied: You are outside the allowed radius.")
