@@ -2,3 +2,4 @@ streamlit
 streamlit-geolocation
 pandas
 geopy
+pytz
