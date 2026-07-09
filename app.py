@@ -10,10 +10,11 @@ from geopy.distance import geodesic
 # --- CONFIG ---
 st.set_page_config(page_title="Pro Attendance System", layout="wide")
 dubai_tz = pytz.timezone("Asia/Dubai")
-conn = sqlite3.connect('attendance_final.db', check_same_thread=False)
+# نستخدم اسم قاعدة بيانات جديد لضمان توافق الجدول بالكامل
+conn = sqlite3.connect('attendance_pro_v3.db', check_same_thread=False)
 c = conn.cursor()
 
-# Initialize Tables
+# تهيئة الجداول بهيكل دقيق
 c.execute('CREATE TABLE IF NOT EXISTS employees (name TEXT, lat REAL, lon REAL, radius REAL, salary REAL)')
 c.execute('CREATE TABLE IF NOT EXISTS logs (name TEXT, time TEXT, type TEXT, lat REAL, lon REAL, photo TEXT)')
 conn.commit()
@@ -42,12 +43,14 @@ with st.sidebar:
 
 # --- EMPLOYEE PORTAL ---
 st.title("Employee Attendance System")
+# جلب أسماء الموظفين الفريدة
 emp_names = list(set([r[0] for r in c.execute("SELECT name FROM employees").fetchall()]))
 selected_name = st.selectbox("Select Your Name", emp_names)
 
 if selected_name:
     loc = streamlit_geolocation()
     if loc and loc['latitude']:
+        # التحقق من كافة مواقع الموظف
         allowed = c.execute("SELECT lat, lon, radius FROM employees WHERE name=?", (selected_name,)).fetchall()
         in_range = any([geodesic((loc['latitude'], loc['longitude']), (l[0], l[1])).meters <= l[2] for l in allowed])
         
