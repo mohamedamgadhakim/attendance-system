@@ -5,50 +5,75 @@ from streamlit_geolocation import streamlit_geolocation
 from datetime import datetime
 from geopy.distance import geodesic
 
-# إعداد قاعدة البيانات
+# Setup Database
 conn = sqlite3.connect('attendance.db', check_same_thread=False)
 c = conn.cursor()
-c.execute('CREATE TABLE IF NOT EXISTS employees (name TEXT, lat REAL, lon REAL)')
-c.execute('CREATE TABLE IF NOT EXISTS logs (name TEXT, time TEXT, type TEXT)')
+c.execute('''CREATE TABLE IF NOT EXISTS employees 
+             (name TEXT PRIMARY KEY, lat REAL, lon REAL, salary REAL, 
+              work_days TEXT, shift_start TEXT, shift_end TEXT, paid_leave REAL)''')
+c.execute('''CREATE TABLE IF NOT EXISTS logs 
+             (name TEXT, time TEXT, action TEXT, lat REAL, lon REAL)''')
 conn.commit()
 
-st.title("نظام الحضور والانصراف - نظام آلي")
+st.title("Attendance & Payroll System")
 
-# تاب الإدارة لإدخال البيانات
-with st.expander("لوحة التحكم (للإدارة فقط)"):
-    admin_pass = st.text_input("كلمة مرور الإدارة", type="password")
+# Admin Dashboard
+with st.expander("Admin Control Panel"):
+    admin_pass = st.text_input("Admin Password", type="password")
     if admin_pass == "1234":
-        name_in = st.text_input("اسم الموظف")
-        lat_in = st.number_input("Lat", format="%.6f")
-        lon_in = st.number_input("Lon", format="%.6f")
-        if st.button("إضافة موظف"):
-            c.execute("INSERT INTO employees VALUES (?, ?, ?)", (name_in, lat_in, lon_in))
-            conn.commit()
-            st.success("تم إضافة الموظف")
+        tab1, tab2, tab3 = st.tabs(["Add/Update Employee", "Delete Employee", "Attendance Logs"])
         
-        st.write("سجلات الحضور:")
-        df_logs = pd.read_sql("SELECT * FROM logs", conn)
-        st.dataframe(df_logs)
-        st.download_button("تصدير إكسيل", df_logs.to_csv(), "attendance.csv")
+        with tab1:
+            name = st.text_input("Employee Name")
+            lat = st.number_input("Allowed Latitude", format="%.6f")
+            lon = st.number_input("Allowed Longitude", format="%.6f")
+            salary = st.number_input("Monthly Salary")
+            work_days = st.text_input("Work Days (e.g., Sat-Thu)")
+            paid_leave = st.number_input("Paid Leaves Allowed")
+            if st.button("Save/Update Employee"):
+                c.execute("REPLACE INTO employees VALUES (?,?,?,?,?,?,?,?)", 
+                          (name, lat, lon, salary, work_days, "09:00", "17:00", paid_leave))
+                conn.commit()
+                st.success("Employee saved.")
 
-# واجهة الموظف
-st.subheader("تسجيل الحضور")
-employees = [row[0] for row in c.execute("SELECT name FROM employees").fetchall()]
-selected_name = st.selectbox("اختر اسمك", employees)
+        with tab2:
+            del_name = st.selectbox("Select employee to delete", [r[0] for r in c.execute("SELECT name FROM employees").fetchall()])
+            if st.button("Delete Employee"):
+                c.execute("DELETE FROM employees WHERE name=?", (del_name,))
+                conn.commit()
+                st.success("Employee deleted.")
+
+        with tab3:
+            df = pd.read_sql("SELECT * FROM logs", conn)
+            st.dataframe(df)
+            st.download_button("Export to CSV", df.to_csv(), "attendance_log.csv")
+
+# Employee Interface
+st.subheader("Mark Attendance")
+emp_list = [r[0] for r in c.execute("SELECT name FROM employees").fetchall()]
+selected_name = st.selectbox("Select your name", emp_list)
+
 loc = streamlit_geolocation()
 
 if loc and loc['latitude']:
-    img = st.camera_input("التقط صورة للحضور")
-    if img and st.button("تأكيد العملية"):
+    img = st.camera_input("Take a photo")
+    if img and st.button("Submit Attendance"):
+        # Fetch target coordinates
         emp_data = c.execute("SELECT lat, lon FROM employees WHERE name=?", (selected_name,)).fetchone()
-        dist = geodesic((loc['latitude'], loc['longitude']), (emp_data[0], emp_data[1])).meters
         
-        if dist <= 100: # النطاق 100 متر
+        # Geofencing Logic: Calculating distance in meters
+        target_loc = (emp_data[0], emp_data[1])
+        current_loc = (loc['latitude'], loc['longitude'])
+        dist = geodesic(current_loc, target_loc).meters
+        
+        # Strict validation
+        if dist <= 150: # 150 meters tolerance
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            c.execute("INSERT INTO logs VALUES (?, ?, ?)", (selected_name, now, "حضور/انصراف"))
+            c.execute("INSERT INTO logs VALUES (?, ?, ?, ?, ?)", 
+                      (selected_name, now, "Check-in/out", loc['latitude'], loc['longitude']))
             conn.commit()
-            st.success(f"تم تسجيل {selected_name} بنجاح!")
+            st.success(f"Attendance recorded successfully! Distance: {int(dist)}m")
         else:
-            st.error(f"أنت خارج النطاق! المسافة: {int(dist)} متر")
+            st.error(f"Access Denied! You are {int(dist)}m away from the authorized location.")
 else:
-    st.info("يجب تفعيل الموقع في المتصفح")
+    st.info("Please enable Location in your browser to proceed.")
