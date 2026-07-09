@@ -9,7 +9,7 @@ from streamlit_geolocation import streamlit_geolocation
 
 # --- CONFIG ---
 st.set_page_config(page_title="Attendance Pro", layout="wide")
-dubai_tz = pytz.timezone("Asia/Dubai")
+dubai_tz = pytz.timezone("Dubai")
 conn = sqlite3.connect('attendance_pro_v3.db', check_same_thread=False)
 c = conn.cursor()
 
@@ -37,20 +37,28 @@ with st.sidebar:
                 except:
                     st.error("Employee already exists.")
 
-        # 2. EDIT EXISTING EMPLOYEE
-        with st.expander("✏️ Edit Existing Employee"):
+        # 2. EDIT/DELETE EMPLOYEE
+        with st.expander("✏️ Edit / Delete Employee"):
             emp_list = [r[0] for r in c.execute("SELECT name FROM employees").fetchall()]
-            target_name = st.selectbox("Select Employee to Edit", emp_list)
+            target_name = st.selectbox("Select Employee", emp_list)
             if target_name:
                 data = c.execute("SELECT * FROM employees WHERE name=?", (target_name,)).fetchone()
                 e_lat = st.number_input("Edit Lat", value=data[1], format="%.6f")
                 e_lon = st.number_input("Edit Lon", value=data[2], format="%.6f")
                 e_rad = st.number_input("Edit Radius (m)", value=data[3])
                 e_sal = st.number_input("Edit Salary", value=data[4])
-                if st.button("Update Details"):
+                
+                col_e, col_d = st.columns(2)
+                if col_e.button("Update Details"):
                     c.execute("UPDATE employees SET lat=?, lon=?, radius=?, salary=? WHERE name=?", (e_lat, e_lon, e_rad, e_sal, target_name))
                     conn.commit()
                     st.success("Updated successfully!")
+                
+                if col_d.button("🗑️ Delete Employee"):
+                    c.execute("DELETE FROM employees WHERE name=?", (target_name,))
+                    conn.commit()
+                    st.warning(f"{target_name} has been deleted.")
+                    st.rerun()
 
         # 3. REPORTS
         st.subheader("Monthly Reports")
@@ -64,7 +72,7 @@ with st.sidebar:
         selected_month = st.selectbox("Select Month", sorted(df['month'].unique(), reverse=True))
         
         if st.button("Export Selected Month"):
-            filtered_df = df[df['month'] == selected_month]
+            filtered_df = df[df['month'] == selected_month].sort_values(['name', 'type', 'time'])
             html = "<html><body><h1>Report</h1><table border='1'><tr><th>Name</th><th>Time</th><th>Action</th><th>Photo</th></tr>"
             for _, row in filtered_df.iterrows():
                 img_tag = f"<img src='data:image/png;base64,{row['photo']}' width='60'>" if row['photo'] else "No Photo"
