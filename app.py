@@ -1,40 +1,43 @@
 import streamlit as st
 import pandas as pd
-import requests
+import requests, base64
 from datetime import datetime
 import pytz
+from geopy.distance import geodesic
 from streamlit_geolocation import streamlit_geolocation
 
-# --- CONFIG ---
-WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwBbxweh9uGtzQLoKrqi6F9VKuYwRJU4lp6y-bYQD5597tYx6ylTn7LRbj5EM0cujh3/exec"
+WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwWNmDtToXAbWq9CGEBsU41ndXd3QE0GXM_uzNVeKIjERrh8I0i4Uj0C4f8SMrUAhk/exec"
 dubai_tz = pytz.timezone("Asia/Dubai")
 
-st.title("📍 Employee Attendance Portal")
+st.title("📍 Attendance System")
 
-# 1. جلب الأسماء من جوجل شيت
+# جلب الأسماء
 try:
-    response = requests.get(WEB_APP_URL)
-    data = response.json()
-    # تحويل البيانات لـ DataFrame (بافتراض الصف الأول هو العناوين)
+    data = requests.get(WEB_APP_URL).json()
     df_emp = pd.DataFrame(data[1:], columns=data[0])
-    employee_names = df_emp['Name'].tolist()
-except:
-    st.error("Cannot load employees. Check your Google Script link.")
-    employee_names = []
+except: st.error("Database connection error"); st.stop()
 
-# 2. اختيار الاسم من قائمة
-selected_name = st.selectbox("Select Your Name", [None] + employee_names)
+selected_name = st.selectbox("Select Name", [None] + df_emp['Name'].tolist())
 
 if selected_name:
+    emp_info = df_emp[df_emp['Name'] == selected_name].iloc[0]
     loc = streamlit_geolocation()
+    
     if loc and loc.get('latitude'):
-        img = st.camera_input("Capture Attendance")
-        if img:
-            now = datetime.now(dubai_tz).strftime("%Y-%m-%d %H:%M:%S")
-            # إرسال البيانات
-            payload = {"name": selected_name, "time": now, "type": "Check", "lat": loc['latitude'], "lon": loc['longitude']}
-            response = requests.post(WEB_APP_URL, json=payload)
-            if response.status_code == 200:
-                st.success("✅ Attendance Recorded!")
-            else:
-                st.error("Failed to connect to database.")
+        dist = geodesic((loc['latitude'], loc['longitude']), (float(emp_info['Lat']), float(emp_info['Lon']))).meters
+        
+        if dist <= float(emp_info['Radius']):
+            img = st.camera_input("Capture Attendance")
+            if img:
+                b64_img = base64.b64encode(img.getvalue()).decode()
+                now = datetime.now(dubai_tz).strftime("%Y-%m-%d %H:%M:%S")
+                
+                c1, c2 = st.columns(2)
+                if c1.button("Check-in"):
+                    requests.post(WEB_APP_URL, json={"name": selected_name, "time": now, "type": "In", "lat": loc['latitude'], "lon": loc['longitude'], "photo": b64_img})
+                    st.success("Check-in Recorded!")
+                if c2.button("Check-out"):
+                    requests.post(WEB_APP_URL, json={"name": selected_name, "time": now, "type": "Out", "lat": loc['latitude'], "lon": loc['longitude'], "photo": b64_img})
+                    st.success("Check-out Recorded!")
+        else:
+            st.error(f"❌ Out of range! ({int(dist)}m)")
