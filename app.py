@@ -1,43 +1,28 @@
 import streamlit as st
 import pandas as pd
-import requests, base64
-from datetime import datetime
-import pytz
-from geopy.distance import geodesic
-from streamlit_geolocation import streamlit_geolocation
+import requests
 
+# رابط الجوجل شيت الخاص بك (تأكد من وضع الرابط الذي يعمل)
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbydsiNgL7fDAF7-dP9_9lX8QG3_ASsT2qw6Qws1kX4tCA5li3pUFlTFFxYFCk3yqh8q/exec"
-dubai_tz = pytz.timezone("Asia/Dubai")
+
+st.set_page_config(page_title="Attendance System", layout="centered")
 
 st.title("📍 Attendance System")
 
-# جلب الأسماء
+# محاولة جلب بيانات الموظفين
 try:
-    data = requests.get(WEB_APP_URL).json()
-    df_emp = pd.DataFrame(data[1:], columns=data[0])
-except: st.error("Database connection error"); st.stop()
-
-selected_name = st.selectbox("Select Name", [None] + df_emp['Name'].tolist())
-
-if selected_name:
-    emp_info = df_emp[df_emp['Name'] == selected_name].iloc[0]
-    loc = streamlit_geolocation()
-    
-    if loc and loc.get('latitude'):
-        dist = geodesic((loc['latitude'], loc['longitude']), (float(emp_info['Lat']), float(emp_info['Lon']))).meters
+    response = requests.get(WEB_APP_URL)
+    if response.status_code == 200:
+        data = response.json()
+        df_emp = pd.DataFrame(data[1:], columns=data[0])
         
-        if dist <= float(emp_info['Radius']):
-            img = st.camera_input("Capture Attendance")
-            if img:
-                b64_img = base64.b64encode(img.getvalue()).decode()
-                now = datetime.now(dubai_tz).strftime("%Y-%m-%d %H:%M:%S")
-                
-                c1, c2 = st.columns(2)
-                if c1.button("Check-in"):
-                    requests.post(WEB_APP_URL, json={"name": selected_name, "time": now, "type": "In", "lat": loc['latitude'], "lon": loc['longitude'], "photo": b64_img})
-                    st.success("Check-in Recorded!")
-                if c2.button("Check-out"):
-                    requests.post(WEB_APP_URL, json={"name": selected_name, "time": now, "type": "Out", "lat": loc['latitude'], "lon": loc['longitude'], "photo": b64_img})
-                    st.success("Check-out Recorded!")
-        else:
-            st.error(f"❌ Out of range! ({int(dist)}m)")
+        # اختيار الاسم
+        selected_name = st.selectbox("Select Your Name", [None] + df_emp['Name'].tolist())
+        
+        if selected_name:
+            st.write(f"Welcome {selected_name}")
+            # هنا سنضع باقي كود البصمة (الذي اتفقنا عليه)
+    else:
+        st.error("Error: Could not reach the database. Check Web App URL.")
+except Exception as e:
+    st.error(f"System Error: {e}")
