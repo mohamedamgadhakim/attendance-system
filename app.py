@@ -103,14 +103,14 @@ if selected_name:
                     st.session_state['loading'] = True
                     requests.post(WEB_APP_URL, json={"name": selected_name, "time": now, "type": "In", "lat": loc['latitude'], "lon": loc['longitude'], "photo": b64_img})
                     st.success("Check-in recorded!")
-                    st.rerun() # لإعادة تحميل الصفحة وتصفيرها
+                    st.experimental_rerun() # لإعادة تحميل الصفحة وتصفيرها
                 
                 # زرار الانصراف
                 if c2.button("Check-out", disabled=st.session_state.get('loading', False)):
                     st.session_state['loading'] = True
                     requests.post(WEB_APP_URL, json={"name": selected_name, "time": now, "type": "Out", "lat": loc['latitude'], "lon": loc['longitude'], "photo": b64_img})
                     st.success("Check-out recorded!")
-                    st.rerun() # لإعادة تحميل الصفحة وتصفيرها
+                    st.experimental_rerun() # لإعادة تحميل الصفحة وتصفيرها
         else:
 
             st.error(f"Access Denied! You are {int(dist)}m away. Allowed radius: {int(radius)}m.")
