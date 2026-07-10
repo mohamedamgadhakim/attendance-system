@@ -6,7 +6,7 @@ import pytz
 from geopy.distance import geodesic
 from streamlit_geolocation import streamlit_geolocation
 
-WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzsmQNmsXRT3Tkz1ruZBeX3gLUgLHRyAVfALaYQFlfPk5OOelj6MiA2Mf23l0oiS2A/exec"
+WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxpsf22erhQ4EV1E7OO0A3oXV_Kdq5pVhfmQFgZUW46xU5-A0WuZxCqJYV3wd2MjQek/exec"
 dubai_tz = pytz.timezone("Asia/Dubai")
 
 st.title("Attendance System")
