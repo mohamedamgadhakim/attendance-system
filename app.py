@@ -9,8 +9,10 @@ from streamlit_geolocation import streamlit_geolocation
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxpsf22erhQ4EV1E7OO0A3oXV_Kdq5pVhfmQFgZUW46xU5-A0WuZxCqJYV3wd2MjQek/exec"
 dubai_tz = pytz.timezone("Asia/Dubai")
 
-st.title("Attendance System")
-
+# أضف هذه السطور بدلاً من st.title("Attendance System")
+st.image("https://lh3.googleusercontent.com/d/1jKgpfMHFtyMJ86A6cTgFNiriK7tQuT3p", width=150)
+st.markdown("<h1 style='text-align: center;'>NO ERRORS IT SERVICES</h1>", unsafe_allow_html=True)
+st.subheader("Attendance System")
 # Fetch Employee Data
 try:
     response = requests.get(WEB_APP_URL)
