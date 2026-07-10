@@ -47,19 +47,20 @@ if selected_name:
                 b64_img = base64.b64encode(img.getvalue()).decode()
                 now = datetime.now(dubai_tz).strftime("%Y-%m-%d %H:%M:%S")
                 
-            c1, c2 = st.columns(2)
-                # تعديل زرار الحضور
+                c1, c2 = st.columns(2)
+                
+                # Check-in button
                 if c1.button("Check-in", disabled=st.session_state.get('btn_disabled', False)):
                     st.session_state['btn_disabled'] = True
                     requests.post(WEB_APP_URL, json={"name": selected_name, "time": now, "type": "In", "lat": loc['latitude'], "lon": loc['longitude'], "photo": b64_img})
                     st.success("Check-in recorded!")
-                    st.experimental_rerun() # سطر إعادة التحميل
+                    st.rerun()
                 
-                # تعديل زرار الانصراف
+                # Check-out button
                 if c2.button("Check-out", disabled=st.session_state.get('btn_disabled', False)):
                     st.session_state['btn_disabled'] = True
                     requests.post(WEB_APP_URL, json={"name": selected_name, "time": now, "type": "Out", "lat": loc['latitude'], "lon": loc['longitude'], "photo": b64_img})
                     st.success("Check-out recorded!")
-                    st.experimental_rerun() # سطر إعادة التحميل
+                    st.rerun()
         else:
             st.error(f"Access Denied! You are {int(dist)}m away. Allowed radius: {int(radius)}m.")
