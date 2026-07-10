@@ -11,7 +11,7 @@ dubai_tz = pytz.timezone("Asia/Dubai")
 
 # أضف هذه السطور بدلاً من st.title("Attendance System")
 st.image("https://lh3.googleusercontent.com/d/1jKgpfMHFtyMJ86A6cTgFNiriK7tQuT3p", width=150)
-st.markdown("<h1 style='text-align: center;'>NO ERRORS IT SERVICES</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;'>NO ERRORS IT  SERVICES</h1>", unsafe_allow_html=True)
 st.subheader("Attendance System")
 # Fetch Employee Data
 try:
